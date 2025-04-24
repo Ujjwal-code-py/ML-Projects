@@ -37,6 +37,13 @@ Install dependencies:
 
 pip install -r requirements.txt
 
+Create a model/ directory to store your trained models:
+
+mkdir model
+
+Save your trained classification and clustering models inside the model/ folder, e.g., classifier.pkl, kmeans.pkl, and any preprocessing scalers like scaler.pkl.
+
+
 Run the application:
 
 streamlit run app.py
