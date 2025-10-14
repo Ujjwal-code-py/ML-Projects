@@ -255,11 +255,30 @@ def analytics():
     st.subheader("Mutual Funds Analytics Dashboard")
     
     try:
-        # Load your data
-        df = pd.read_excel("data/cleaned_data.xlsx")
-
+        # Load data from Google Sheets
+        def load_google_sheets_data():
+            # YOUR ACTUAL GOOGLE SHEET ID
+            SHEET_ID = "1aIdCAOWZhRp1rEbr4H-kqocHB9oQn2i31gAAH8nsXYY"
+            
+            # Construct the CSV export URL
+            csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+            
+            # Read the data
+            df = pd.read_csv(csv_url)
+            return df
         
-        # Debug: Show available columns to understand data structure
+        # Load the data
+        with st.spinner('Loading data from Google Sheets...'):
+            df = load_google_sheets_data()
+        
+        # st.success("✅ Data loaded successfully from Google Sheets!")
+        
+        # # Debug: Show data info
+        # st.write(f"**Dataset loaded:** {len(df)} rows, {len(df.columns)} columns")
+        # st.write("**First few rows:**")
+        # st.dataframe(df.head(3))
+        
+        # Rest of your existing analytics code continues here...
         st.sidebar.write("**Data Columns:**", list(df.columns))
         
         # Create tabs for different types of analysis
@@ -328,33 +347,59 @@ def analytics():
             # Risk vs Returns scatter plot if columns exist
             if 'three_year_returns' in df.columns and 'equity_per' in df.columns:
                 st.write("#### Equity Allocation vs Returns")
-                fig, ax = plt.subplots(figsize=(10, 6))
                 
-                # Create base scatter plot
-                if 'risk_of_the_fund' in df.columns and 'aum_funds_individual_lst' in df.columns:
+                # Clean the data first
+                plot_df = df.dropna(subset=['three_year_returns', 'equity_per']).copy()
+                
+                fig, ax = plt.subplots(figsize=(12, 8))
+                
+                # SIMPLIFIED VERSION - Remove size mapping to AUM
+                if 'risk_of_the_fund' in df.columns:
+                    # Create scatter plot without size mapping
                     scatter = sns.scatterplot(
-                        data=df, 
+                        data=plot_df, 
                         x='three_year_returns', 
                         y='equity_per', 
                         hue='risk_of_the_fund',
-                        size='aum_funds_individual_lst',
-                        sizes=(20, 200),
+                        s=60,  # Fixed size
                         ax=ax,
                         palette='viridis'
                     )
-                    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                    # Move legend outside the plot
+                    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Risk Level')
                 else:
+                    # Basic scatter plot without risk coloring
                     scatter = sns.scatterplot(
-                        data=df, 
+                        data=plot_df, 
                         x='three_year_returns', 
                         y='equity_per', 
+                        s=60,
                         ax=ax
                     )
                 
-                ax.set_title('Equity Allocation vs 3-Year Returns')
-                ax.set_xlabel('3-Year Returns (%)')
-                ax.set_ylabel('Equity Percentage (%)')
+                ax.set_title('Equity Allocation vs 3-Year Returns', fontsize=14, fontweight='bold')
+                ax.set_xlabel('3-Year Returns (%)', fontsize=12)
+                ax.set_ylabel('Equity Percentage (%)', fontsize=12)
+                
+                # Add grid for better readability
+                ax.grid(True, alpha=0.3)
+                
+                # Adjust layout to prevent legend cutoff
+                plt.tight_layout()
                 st.pyplot(fig)
+                
+                # Show some statistics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Funds Plotted", len(plot_df))
+                with col2:
+                    correlation = plot_df['three_year_returns'].corr(plot_df['equity_per'])
+                    st.metric("Correlation", f"{correlation:.2f}")
+                with col3:
+                    st.metric("Average Equity %", f"{plot_df['equity_per'].mean():.1f}%")
+            
+            else:
+                st.warning("Required columns ('three_year_returns' and 'equity_per') not found for risk-return analysis.")
             
             # Risk category performance if column exists
             if 'risk_of_the_fund' in df.columns:
@@ -364,13 +409,25 @@ def analytics():
                     risk_performance = df.groupby('risk_of_the_fund')[risk_columns].mean().round(2)
                     st.dataframe(risk_performance)
                 
-                # Risk distribution
+                # Risk distribution - SIMPLIFIED
                 st.write("#### Risk Category Distribution")
                 risk_counts = df['risk_of_the_fund'].value_counts()
-                fig, ax = plt.subplots(figsize=(8, 6))
-                plt.pie(risk_counts.values, labels=risk_counts.index, autopct='%1.1f%%', startangle=90)
-                ax.set_title('Distribution of Funds by Risk Category')
-                st.pyplot(fig)
+                
+                fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+                
+                # Pie chart
+                ax1.pie(risk_counts.values, labels=risk_counts.index, autopct='%1.1f%%', 
+                       startangle=90, colors=sns.color_palette("viridis", len(risk_counts)))
+                ax1.set_title('Distribution by Risk Category')
+                
+                # Bar chart
+                risk_counts.sort_values(ascending=False).plot(kind='bar', ax=ax2, color='skyblue')
+                ax2.set_title('Number of Funds by Risk Category')
+                ax2.set_ylabel('Number of Funds')
+                ax2.tick_params(axis='x', rotation=45)
+                
+                plt.tight_layout()
+                st.pyplot(fig2)
         
         with tab3:
             st.write("### Top Performing Funds")
@@ -413,14 +470,6 @@ def analytics():
                     st.dataframe(top_5yr.reset_index(drop=True), use_container_width=True)
                 else:
                     st.write("5-year returns data not available")
-            
-            # Best performing fund types
-            if 'type_of_fund' in df.columns:
-                st.write("#### Performance by Fund Category")
-                performance_cols = [col for col in ['three_year_returns', 'five_year_returns'] if col in df.columns]
-                if performance_cols:
-                    category_stats = df.groupby('type_of_fund')[performance_cols].agg(['mean', 'max', 'min']).round(2)
-                    st.dataframe(category_stats)
         
         with tab4:
             st.write("### Data Explorer")
@@ -497,19 +546,20 @@ def analytics():
                 st.metric("Risk Levels", unique_risks)
             else:
                 st.metric("Risk Levels", "N/A")
-        
+                
     except Exception as e:
         st.error(f"Error loading analytics data: {e}")
+        st.info("""
+        **To fix this:**
+        1. Make sure your Google Sheet is publicly accessible (Anyone with link can view)
+        2. Check that your Google Sheet has data in the expected format
+        3. Verify the column names match what the code expects
+        """)
         
-        # Show sample of available data for debugging
-        try:
-            df_sample = pd.read_excel("data/cleaned_data.xlsx")
-            st.write("**Available data columns:**")
-            st.write(list(df_sample.columns))
-            st.write("**First 5 rows:**")
-            st.dataframe(df_sample.head())
-        except:
-            st.error("Could not read the Excel file. Please make sure 'cleaned_data.xlsx' exists in the current directory.")
+        # Show what we tried to load
+        st.write("**Troubleshooting info:**")
+        st.write(f"Error type: {type(e).__name__}")
+        st.write("Full error:", str(e))
 def description():
     st.subheader("About This Tool")
     
