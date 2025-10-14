@@ -255,8 +255,8 @@ def analytics():
     st.subheader("Mutual Funds Analytics Dashboard")
     
     try:
-        # Load your data
-        df = pd.read_excel("data/cleaned_data.xlsx")
+        drive_url = "https://drive.google.com/uc?export=download&id=198X7KeoJwq7DHb-V4hn1DAbXrDPK6Wjo"
+        df=pd.read_excel(drive_url)
 
         
         # Debug: Show available columns to understand data structure
@@ -503,7 +503,8 @@ def analytics():
         
         # Show sample of available data for debugging
         try:
-            df_sample = pd.read_excel("data/cleaned_data.xlsx")
+            drive_url = "https://drive.google.com/uc?export=download&id=198X7KeoJwq7DHb-V4hn1DAbXrDPK6Wjo"
+            df_sample=pd.read_excel(drive_url)
             st.write("**Available data columns:**")
             st.write(list(df_sample.columns))
             st.write("**First 5 rows:**")
