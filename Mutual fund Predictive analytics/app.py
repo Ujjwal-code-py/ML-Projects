@@ -256,7 +256,8 @@ def analytics():
     
     try:
         # Load your data
-        df = pd.read_excel('cleaned_data.xlsx')
+        df = pd.read_excel("data/cleaned_data.xlsx")
+
         
         # Debug: Show available columns to understand data structure
         st.sidebar.write("**Data Columns:**", list(df.columns))
@@ -502,7 +503,7 @@ def analytics():
         
         # Show sample of available data for debugging
         try:
-            df_sample = pd.read_excel('cleaned_data.xlsx')
+            df_sample = pd.read_excel("data/cleaned_data.xlsx")
             st.write("**Available data columns:**")
             st.write(list(df_sample.columns))
             st.write("**First 5 rows:**")
