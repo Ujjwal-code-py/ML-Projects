@@ -1,16 +1,1 @@
-# Core ML & Data Science
-pandas==2.2.3
-numpy==2.1.1
-scikit-learn==1.5.2
-joblib==1.4.2
 
-# Web Application
-streamlit==1.39.0
-
-# Visualization
-matplotlib==3.9.2
-seaborn==0.13.2
-
-# Additional utilities
-python-dateutil==2.9.0.post0
-pytz==2024.2
