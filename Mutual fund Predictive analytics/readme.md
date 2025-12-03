@@ -1,7 +1,7 @@
 ## Complete Mutual Fund Returns Prediction Project Documentation
 1. Project Overview
-Objective: Predict 1-year, 3-year, and 5-year returns for mutual funds using machine learning
-Data: 1001 mutual funds with 12 features including AUM, NAV, ratings, portfolio composition, and historical returns
+    Objective: Predict 1-year, 3-year, and 5-year returns for mutual funds using machine learning
+    Data: 1001 mutual funds with 12 features including AUM, NAV, ratings, portfolio composition, and historical returns
 
 2. Data Preprocessing Steps
 2.1 Data Cleaning
