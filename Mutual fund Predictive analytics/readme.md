@@ -1,28 +1,28 @@
 ## Complete Mutual Fund Returns Prediction Project Documentation
-1. Project Overview
-    Objective: Predict 1-year, 3-year, and 5-year returns for mutual funds using machine learning
-    Data: 1001 mutual funds with 12 features including AUM, NAV, ratings, portfolio composition, and historical returns
+### 1. Project Overview
+    - Objective: Predict 1-year, 3-year, and 5-year returns for mutual funds using machine learning
+    - Data: 1001 mutual funds with 12 features including AUM, NAV, ratings, portfolio composition, and historical returns
 
-2. Data Preprocessing Steps
-2.1 Data Cleaning
-Missing Value Handling:
+## 2. Data Preprocessing Steps
+### 2.1 Data Cleaning
+#### Missing Value Handling:
 
-rating_of_funds_individual_lst: ~25% missing → Median imputation (value: 3)
+- rating_of_funds_individual_lst: ~25% missing → Median imputation (value: 3)
 
-five_year_returns: ~40% missing → Used available data only (no imputation for targets)
+- five_year_returns: ~40% missing → Used available data only (no imputation for targets)
 
-three_year_returns: ~5% missing → Used available data only
+- three_year_returns: ~5% missing → Used available data only
 
-one_year_returns: ~3% missing → Used available data only
+- one_year_returns: ~3% missing → Used available data only
 
-Data Type Conversion:
+#### Data Type Conversion:
 
 All numerical columns converted to float using pd.to_numeric(errors='coerce')
 
 Categorical variables: risk_of_the_fund, type_of_fund encoded
 
-2.2 Feature Engineering
-2.2.1 Risk Score Encoding
+#### 2.2 Feature Engineering
+##### 2.2.1 Risk Score Encoding
 python
 risk_mapping = {
     'Very High': 5,
@@ -33,33 +33,33 @@ risk_mapping = {
     'Moderately Low': 1,
     'Low': 0.5
 }
-Purpose: Convert categorical risk levels to numerical scores for model consumption
+- Purpose: Convert categorical risk levels to numerical scores for model consumption
 
-2.2.2 Fund Type Encoding
+##### 2.2.2 Fund Type Encoding
 Used LabelEncoder() to convert fund types to numerical values
 
-Categories: Equity, Hybrid, Debt, Solution Oriented, Other
+- Categories: Equity, Hybrid, Debt, Solution Oriented, Other
 
-2.2.3 Derived Features
-AUM/NAV Ratio: aum_funds_individual_lst / nav_funds_individual_lst
+##### 2.2.3 Derived Features
+- AUM/NAV Ratio: aum_funds_individual_lst / nav_funds_individual_lst
 
-Purpose: Measure fund size relative to NAV
+- Purpose: Measure fund size relative to NAV
 
-Equity Concentration: equity_per / 100
+- Equity Concentration: equity_per / 100
 
-Purpose: Normalize equity percentage to 0-1 scale
+- Purpose: Normalize equity percentage to 0-1 scale
 
-Debt Concentration: debt_per / 100
+- Debt Concentration: debt_per / 100
 
-Purpose: Normalize debt percentage to 0-1 scale
+- Purpose: Normalize debt percentage to 0-1 scale
 
-Fund Type Indicators:
+- Fund Type Indicators:
 
-is_equity_fund: Binary indicator (1 if Equity, else 0)
+- is_equity_fund: Binary indicator (1 if Equity, else 0)
 
-is_hybrid_fund: Binary indicator (1 if Hybrid, else 0)
+- is_hybrid_fund: Binary indicator (1 if Hybrid, else 0)
 
-2.3 Final Feature Set (13 Features)
+#### 2.3 Final Feature Set (13 Features)
 aum_funds_individual_lst - Assets Under Management
 
 nav_funds_individual_lst - Net Asset Value
@@ -86,41 +86,41 @@ is_equity_fund - Equity Fund Indicator
 
 is_hybrid_fund - Hybrid Fund Indicator
 
-3. Machine Learning Algorithms Used
-3.1 Algorithm Selection
+### 3. Machine Learning Algorithms Used
+#### 3.1 Algorithm Selection
 Four algorithms were tested for each prediction horizon:
 
-3.1.1 Linear Regression
-Type: Linear model
+##### 3.1.1 Linear Regression
+- Type: Linear model
 
-Advantages: Simple, interpretable, fast
+- Advantages: Simple, interpretable, fast
 
-Hyperparameters: Default sklearn parameters
+- Hyperparameters: Default sklearn parameters
 
-3.1.2 Ridge Regression
-Type: Regularized linear model
+##### 3.1.2 Ridge Regression
+- Type: Regularized linear model
 
-Advantages: Handles multicollinearity, prevents overfitting
+- Advantages: Handles multicollinearity, prevents overfitting
 
-Hyperparameters: alpha=1.0 (L2 regularization strength)
+- Hyperparameters: alpha=1.0 (L2 regularization strength)
 
-3.1.3 Random Forest Regressor
-Type: Ensemble method (bagging)
+##### 3.1.3 Random Forest Regressor
+- Type: Ensemble method (bagging)
 
-Advantages: Handles non-linearity, robust to outliers
+- Advantages: Handles non-linearity, robust to outliers
 
-Hyperparameters:
+- Hyperparameters:
 
 n_estimators=100 (number of trees)
 
 random_state=42 (reproducibility)
 
-3.1.4 Gradient Boosting Regressor ⭐ BEST PERFORMER
-Type: Ensemble method (boosting)
+##### 3.1.4 Gradient Boosting Regressor ⭐ BEST PERFORMER
+- Type: Ensemble method (boosting)
 
-Advantages: High accuracy, handles complex patterns
+- Advantages: High accuracy, handles complex patterns
 
-Hyperparameters:
+- Hyperparameters:
 
 n_estimators=100 (number of boosting stages)
 
@@ -130,43 +130,43 @@ max_depth=3 (maximum tree depth)
 
 random_state=42 (reproducibility)
 
-3.2 Final Model Selection
+#### 3.2 Final Model Selection
 Gradient Boosting Regressor was selected as the final model due to superior performance across all time horizons.
 
-4. Model Training & Validation
-4.1 Dataset Splits
-1-Year Returns: 966 samples
+### 4. Model Training & Validation
+#### 4.1 Dataset Splits
+- 1-Year Returns: 966 samples
 
-3-Year Returns: 817 samples
+- 3-Year Returns: 817 samples
 
-4-Year Returns: 696 samples
+- 4-Year Returns: 696 samples
 
-4.2 Cross-Validation Strategy
-TimeSeriesSplit with 5 folds:
+#### 4.2 Cross-Validation Strategy
+- TimeSeriesSplit with 5 folds:
 
 python
 tscv = TimeSeriesSplit(n_splits=5)
-Purpose: Respect temporal ordering in financial data, prevent data leakage
+- Purpose: Respect temporal ordering in financial data, prevent data leakage
 
-4.3 Feature Scaling
-Method: StandardScaler (Z-score normalization)
+#### 4.3 Feature Scaling
+- Method: StandardScaler (Z-score normalization)
 
-Formula: (x - mean) / std
+- Formula: (x - mean) / std
 
-Applied: Separately for each time horizon dataset
+- Applied: Separately for each time horizon dataset
 
-4.4 Missing Value Imputation for Features
-Method: KNNImputer with n_neighbors=5
+#### 4.4 Missing Value Imputation for Features
+- Method: KNNImputer with n_neighbors=5
 
-Purpose: Use similar funds to impute missing feature values
+- Purpose: Use similar funds to impute missing feature values
 
-5. Model Performance & Fine-Tuning
-5.1 Performance Metrics
-R² Score: Proportion of variance explained
+### 5. Model Performance & Fine-Tuning
+#### 5.1 Performance Metrics
+- R² Score: Proportion of variance explained
 
-RMSE: Root Mean Square Error (in percentage points)
+- RMSE: Root Mean Square Error (in percentage points)
 
-MAE: Mean Absolute Error (in percentage points)
+- MAE: Mean Absolute Error (in percentage points)
 
 5.2 Final Model Performance
 1-Year Returns Model
