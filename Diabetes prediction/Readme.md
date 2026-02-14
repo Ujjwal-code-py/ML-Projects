@@ -4,7 +4,7 @@ An interactive machine learning web application built with Streamlit that predic
 
 Features:
 
-Diabetes Risk Prediction using a classification model (90%+ accuracy).
+Diabetes Risk Prediction using a Regression model (90%+ accuracy).
 
 Health Profiling with K-Means clustering based on user health features.
 
