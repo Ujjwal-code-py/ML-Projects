@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import pickle
 import numpy as np
-from sklearn import preprocessing  
+import joblib
 import seaborn as sns
 import datetime as dt
 from PIL import Image
@@ -33,42 +33,100 @@ st.markdown("<h1 style='text-align: center; color: white;'>📈 Mutual Fund Retu
 
 @st.cache_resource
 def load_model():
-    """Load the trained model pipeline"""
+    """Load the trained deployment pipeline."""
     try:
-        with open('mutual_fund_returns_pipeline.pkl', 'rb') as f:
-            pipeline = pickle.load(f)
-        return pipeline
+        return joblib.load('mutual_fund_returns_pipeline.pkl')
     except Exception as e:
-        return None
+        try:
+            with open('mutual_fund_returns_pipeline.pkl', 'rb') as f:
+                return pickle.load(f)
+        except Exception:
+            return None
+
+RISK_SCORE_MAPPING = {
+    'Very High': 5,
+    'High': 4,
+    'Moderately High': 3,
+    'Moderate': 2,
+    'Low to Moderate': 1.5,
+    'Moderately Low': 1,
+    'Low': 0.5
+}
+
+FUND_TYPE_ENCODING = {
+    'Debt': 0,
+    'Equity': 1,
+    'Hybrid': 2,
+    'Other': 3,
+    'Solution Oriented': 4
+}
+
+MODEL_PERIOD_KEYS = {
+    "one_year": "1_year",
+    "three_year": "3_year",
+    "five_year": "5_year"
+}
+
+def build_model_features(fund_data, feature_columns):
+    """Create the engineered feature row expected by the saved models."""
+    aum = fund_data['aum']
+    nav = fund_data['nav']
+    equity_per = fund_data['equity_per']
+    debt_per = fund_data['debt_per']
+    fund_type = fund_data['fund_type']
+
+    engineered = {
+        'aum_funds_individual_lst': aum,
+        'nav_funds_individual_lst': nav,
+        'rating_of_funds_individual_lst': fund_data['rating'],
+        'minimum_funds_individual_lst': 500,
+        'debt_per': debt_per,
+        'equity_per': equity_per,
+        'risk_score': RISK_SCORE_MAPPING.get(fund_data['risk'], 2),
+        'fund_type_encoded': FUND_TYPE_ENCODING.get(fund_type, FUND_TYPE_ENCODING['Other']),
+        'aum_nav_ratio': aum / (nav + 1),
+        'equity_concentration': equity_per / 100,
+        'debt_concentration': debt_per / 100,
+        'is_equity_fund': int(fund_type == 'Equity'),
+        'is_hybrid_fund': int(fund_type == 'Hybrid')
+    }
+
+    return pd.DataFrame([{column: engineered.get(column, 0) for column in feature_columns}])
 
 def predict_returns(fund_data, return_type):
-    """Predict returns based on fund characteristics only"""
+    """Predict returns using the saved model pipeline, with a heuristic fallback."""
     try:
-        # Prepare input data for the model using only basic fund characteristics
-        input_data = {
-            'aum_funds_individual_lst': fund_data['aum'],
-            'nav_funds_individual_lst': fund_data['nav'],
-            'rating_of_funds_individual_lst': fund_data['rating'],
-            'debt_per': fund_data['debt_per'],
-            'equity_per': fund_data['equity_per'],
-            'risk_of_the_fund': fund_data['risk'],
-            'type_of_fund': fund_data['fund_type']
-        }
-        
-        # Create DataFrame for prediction
-        prediction_df = pd.DataFrame([input_data])
-        
-        # Make prediction using the pipeline
-        model = load_model()
-        if model is not None:
-            prediction = model.predict(prediction_df)
+        pipeline = load_model()
+        if isinstance(pipeline, dict):
+            model_key = MODEL_PERIOD_KEYS.get(return_type)
+            models = pipeline.get('models', {})
+            scalers = pipeline.get('scalers', {})
+            feature_columns = pipeline.get('feature_columns', [])
+
+            if model_key in models and model_key in scalers and feature_columns:
+                prediction_df = build_model_features(fund_data, feature_columns)
+                prediction_scaled = scalers[model_key].transform(prediction_df)
+                prediction = models[model_key].predict(prediction_scaled)
+                return prediction[0]
+
+        if pipeline is not None and hasattr(pipeline, "predict"):
+            prediction_df = build_model_features(
+                fund_data,
+                [
+                    'aum_funds_individual_lst',
+                    'nav_funds_individual_lst',
+                    'rating_of_funds_individual_lst',
+                    'debt_per',
+                    'equity_per',
+                    'risk_score',
+                    'fund_type_encoded'
+                ]
+            )
+            prediction = pipeline.predict(prediction_df)
             return prediction[0]
-        else:
-            # Fallback calculation if model fails to load
-            return calculate_fallback_return(fund_data, return_type)
-            
+
+        return calculate_fallback_return(fund_data, return_type)
     except Exception as e:
-        # Fallback if prediction fails
         return calculate_fallback_return(fund_data, return_type)
 
 def calculate_fallback_return(fund_data, return_type):
@@ -124,6 +182,91 @@ def get_return_interpretation(prediction_value, return_period):
             return "Good for long-term portfolio"
         else:
             return "Consider other long-term options"
+
+def get_prediction_range(prediction_value):
+    """Convert an exact prediction into a simple presentation-friendly range."""
+    if prediction_value < 0:
+        lower = np.floor(prediction_value / 10) * 10
+        upper = lower + 10
+    else:
+        lower = np.floor(prediction_value / 10) * 10
+        upper = lower + 10
+
+    return int(lower), int(upper)
+
+def get_confidence_label(prediction_value, fund_data):
+    """Estimate confidence from input completeness and model-friendly ranges."""
+    confidence_score = 0
+
+    if fund_data['aum'] > 0:
+        confidence_score += 1
+    if fund_data['nav'] > 0:
+        confidence_score += 1
+    if fund_data['rating'] >= 3:
+        confidence_score += 1
+    if 0 <= fund_data['equity_per'] <= 100:
+        confidence_score += 1
+    if -10 <= prediction_value <= 40:
+        confidence_score += 1
+
+    if confidence_score >= 4:
+        return "High"
+    if confidence_score >= 3:
+        return "Medium"
+    return "Low"
+
+def get_category_average(return_column, fund_type):
+    """Read local data and return the category average for comparison."""
+    try:
+        df = pd.read_excel('data/cleaned_data.xlsx')
+        if return_column not in df.columns or 'type_of_fund' not in df.columns:
+            return None
+
+        category_df = df[df['type_of_fund'] == fund_type]
+        if category_df.empty:
+            return None
+
+        return category_df[return_column].mean()
+    except Exception:
+        return None
+
+def get_category_comparison(prediction_value, category_average, fund_type):
+    """Compare model prediction against dataset category average."""
+    if category_average is None or pd.isna(category_average):
+        return "Category comparison is not available for this selection."
+
+    difference = prediction_value - category_average
+    if difference > 2:
+        return f"This prediction is above the dataset average for {fund_type} funds by about {difference:.1f} percentage points."
+    if difference < -2:
+        return f"This prediction is below the dataset average for {fund_type} funds by about {abs(difference):.1f} percentage points."
+    return f"This prediction is close to the dataset average for {fund_type} funds."
+
+def get_prediction_reasons(fund_data):
+    """Generate simple user-facing reasons from input characteristics."""
+    reasons = []
+
+    if fund_data['equity_per'] >= 70:
+        reasons.append("High equity allocation can increase return potential, but it also increases market risk.")
+    elif fund_data['equity_per'] >= 40:
+        reasons.append("Balanced equity allocation gives moderate growth potential with lower volatility than aggressive equity funds.")
+    else:
+        reasons.append("Lower equity allocation usually reduces return potential but may provide more stability.")
+
+    if fund_data['rating'] >= 4:
+        reasons.append("A higher fund rating supports a stronger prediction because it reflects better historical quality indicators.")
+    elif fund_data['rating'] <= 2:
+        reasons.append("A lower fund rating weakens the prediction because it may indicate weaker historical quality indicators.")
+
+    if fund_data['risk'] in ['Very High', 'High']:
+        reasons.append("The selected risk profile suggests higher volatility and higher possible return movement.")
+    elif fund_data['risk'] in ['Low', 'Moderately Low', 'Low to Moderate']:
+        reasons.append("The selected risk profile suggests a more conservative return pattern.")
+
+    if fund_data['aum'] >= 1000:
+        reasons.append("Higher AUM may indicate fund scale and investor confidence.")
+
+    return reasons[:4]
 
 def main_prediction_page():
     st.subheader("Mutual Fund Returns Prediction")
@@ -183,6 +326,12 @@ def main_prediction_page():
             index=0,  # Default to One Year
             help="Choose the investment period for return prediction"
         )
+
+        show_exact_prediction = st.checkbox(
+            "Show exact model prediction",
+            value=False,
+            help="Enable this if you want to see the precise value predicted by the model."
+        )
         
         submitted = st.form_submit_button('Calculate Returns', use_container_width=True)
 
@@ -207,15 +356,30 @@ def main_prediction_page():
                     "Three Years": "three_year", 
                     "Five Years": "five_year"
                 }
+                return_column_map = {
+                    "One Year": "one_year_returns",
+                    "Three Years": "three_year_returns",
+                    "Five Years": "five_year_returns"
+                }
                 
                 return_type = period_map[return_period]
                 
                 # Predict returns
                 prediction = predict_returns(fund_data, return_type)
                 prediction_value = prediction
+                all_predictions = {
+                    "One Year": predict_returns(fund_data, "one_year"),
+                    "Three Years": predict_returns(fund_data, "three_year"),
+                    "Five Years": predict_returns(fund_data, "five_year")
+                }
                 
                 # Get interpretation
                 interpretation = get_return_interpretation(prediction_value, return_period)
+                range_lower, range_upper = get_prediction_range(prediction_value)
+                confidence_label = get_confidence_label(prediction_value, fund_data)
+                category_average = get_category_average(return_column_map[return_period], type_of_fund)
+                category_comparison = get_category_comparison(prediction_value, category_average, type_of_fund)
+                prediction_reasons = get_prediction_reasons(fund_data)
                 
                 # Display result with improved styling
                 st.markdown("---")
@@ -235,17 +399,76 @@ def main_prediction_page():
                     f"""
                     <div style='text-align: center; padding: 20px;'>
                         <h3 style='color: #FFFFFF; margin-bottom: 5px; font-size: 18px; font-weight: 600;'>
-                            Predicted {return_period} Returns
+                            Estimated {return_period} Return Range
                         </h3>
                         <div style='font-size: 52px; color: {color}; font-weight: bold; margin: 10px 0;'>
-                            {arrow} {sign}{prediction_value:.2f}%
+                            {arrow} {range_lower}% to {range_upper}%
                         </div>
                         <div style='color: #FFFFFF; font-size: 16px; font-weight: 500; margin-top: 10px;'>
                             {interpretation}
                         </div>
+                        <div style='color: #D9D9D9; font-size: 14px; margin-top: 8px;'>
+                            Confidence: {confidence_label}
+                        </div>
                     </div>
                     """, 
                     unsafe_allow_html=True
+                )
+
+                if show_exact_prediction:
+                    st.info(f"Exact model prediction: {prediction_value:.2f}%")
+
+                st.write("### Category Comparison")
+                if category_average is not None and not pd.isna(category_average):
+                    st.metric(
+                        f"Average {return_period} Return for {type_of_fund} Funds",
+                        f"{category_average:.2f}%"
+                    )
+                st.write(category_comparison)
+
+                st.write("### Return Forecast Chart")
+                chart_df = pd.DataFrame({
+                    "Period": list(all_predictions.keys()),
+                    "Predicted Return (%)": list(all_predictions.values())
+                })
+
+                fig, ax = plt.subplots(figsize=(8, 4))
+                bar_colors = [
+                    "#00cc66" if period == return_period else "#4ECDC4"
+                    for period in chart_df["Period"]
+                ]
+                bars = ax.bar(
+                    chart_df["Period"],
+                    chart_df["Predicted Return (%)"],
+                    color=bar_colors
+                )
+                ax.set_title("Predicted Returns Across Investment Horizons")
+                ax.set_ylabel("Predicted Return (%)")
+                ax.set_xlabel("Investment Horizon")
+                ax.axhline(0, color="#333333", linewidth=0.8)
+                ax.grid(axis="y", alpha=0.25)
+
+                for bar in bars:
+                    height = bar.get_height()
+                    label_y = height if height >= 0 else 0
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        label_y,
+                        f"{height:.1f}%",
+                        ha="center",
+                        va="bottom" if height >= 0 else "top",
+                        fontsize=10
+                    )
+
+                plt.tight_layout()
+                st.pyplot(fig)
+
+                st.write("### Why This Prediction?")
+                for reason in prediction_reasons:
+                    st.write(f"- {reason}")
+
+                st.warning(
+                    "Educational use only. This prediction is based on historical data and selected fund characteristics; it is not financial advice."
                 )
                 
             except Exception as e:
@@ -255,17 +478,13 @@ def analytics():
     st.subheader("Mutual Funds Analytics Dashboard")
     
     try:
-        # Load data from Google Sheets
         def load_google_sheets_data():
-            # YOUR ACTUAL GOOGLE SHEET ID
             SHEET_ID = "1aIdCAOWZhRp1rEbr4H-kqocHB9oQn2i31gAAH8nsXYY"
-            
-            # Construct the CSV export URL
             csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-            
-            # Read the data
-            df = pd.read_csv(csv_url)
-            return df
+            try:
+                return pd.read_csv(csv_url)
+            except Exception:
+                return pd.read_excel('data/cleaned_data.xlsx')
         
         # Load the data
         with st.spinner('Loading data from Google Sheets...'):

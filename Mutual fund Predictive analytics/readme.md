@@ -1,358 +1,310 @@
-## Complete Mutual Fund Returns Prediction Project Documentation
-### 1. Project Overview
-    - Objective: Predict 1-year, 3-year, and 5-year returns for mutual funds using machine learning
-    - Data: 1001 mutual funds with 12 features including AUM, NAV, ratings, portfolio composition, and historical returns
+# Mutual Fund Predictive Analytics
 
-## 2. Data Preprocessing Steps
-### 2.1 Data Cleaning
-#### Missing Value Handling:
+##  App Link -> [https://mutualfundpredictionankush.streamlit.app/](https://mutualfundpredictionankush.streamlit.app/)
 
-- rating_of_funds_individual_lst: ~25% missing → Median imputation (value: 3)
+## Abstract
 
-- five_year_returns: ~40% missing → Used available data only (no imputation for targets)
+This project predicts expected mutual fund returns for 1-year, 3-year, and 5-year investment horizons using historical mutual fund data, fund characteristics, and machine learning regression models. The project includes a data scraping pipeline, data cleaning script, model experimentation notebooks, a saved deployment pipeline, and a Streamlit application for interactive prediction and analytics.
 
-- three_year_returns: ~5% missing → Used available data only
+The core idea is that a fund's return behavior can be partially explained by measurable fund attributes such as Assets Under Management (AUM), Net Asset Value (NAV), fund rating, equity allocation, debt allocation, risk profile, and fund category. The final modelling workflow uses feature engineering and ensemble regression to estimate future return percentages.
 
-- one_year_returns: ~3% missing → Used available data only
+Important note: this is an educational predictive analytics project. It is not financial advice. Mutual fund returns depend on market, macroeconomic, manager, liquidity, and regulatory factors that are not fully captured in this dataset.
 
-#### Data Type Conversion:
+## Project Objectives
 
-All numerical columns converted to float using pd.to_numeric(errors='coerce')
+- Collect mutual fund data from Groww pages and Groww portfolio statistics endpoints.
+- Clean raw financial strings such as rupee-formatted AUM and NAV values into numeric columns.
+- Engineer finance-relevant features such as risk score, AUM/NAV ratio, allocation concentration, and fund type indicators.
+- Compare regression algorithms for return prediction.
+- Save a trained model pipeline for deployment.
+- Build a Streamlit app where a user can enter fund characteristics and receive predicted returns.
+- Provide an analytics dashboard for data exploration, risk-return analysis, and top-performing funds.
 
-Categorical variables: risk_of_the_fund, type_of_fund encoded
+## Repository Structure
 
-#### 2.2 Feature Engineering
-##### 2.2.1 Risk Score Encoding
-python
-risk_mapping = {
-    'Very High': 5,
-    'High': 4,
-    'Moderately High': 3,
-    'Moderate': 2,
-    'Low to Moderate': 1.5,
-    'Moderately Low': 1,
-    'Low': 0.5
-}
-- Purpose: Convert categorical risk levels to numerical scores for model consumption
+| File | Purpose |
+| --- | --- |
+| `app.py` | Streamlit web app for prediction, analytics dashboard, and project explanation. |
+| `scraper and extraction.py` | Scrapes mutual fund data from Groww listing/detail pages and portfolio API endpoints. |
+| `Tranformation.py` | Cleans `raw_data.xlsx` by dropping unused columns and converting AUM/NAV fields. |
+| `raw_data.xlsx` | Raw scraped dataset. |
+| `data/cleaned_data.xlsx` | Cleaned dataset used for analysis/modeling. |
+| `p1.ipynb` | Main end-to-end modelling notebook with feature engineering, model comparison, final model training, diagnostics, and pipeline export. |
+| `Model testing for 1 year analysis.ipynb` | Earlier/individual experiments for 1-year return prediction. |
+| `Model testing for 3 year analysis.ipynb` | Earlier/individual experiments for 3-year return prediction. |
+| `Model testing for 5 year analysis.ipynb` | Earlier/individual experiments for 5-year return prediction. |
+| `mutual_fund_returns_pipeline.pkl` | Saved deployment artifact containing trained models, scalers, feature columns, metrics, and metadata. |
+| `requirements.txt` | Python dependencies needed to run the project. |
+| `runtime.txt` | Python runtime target for deployment. |
 
-##### 2.2.2 Fund Type Encoding
-Used LabelEncoder() to convert fund types to numerical values
+## Research Paper Style Summary
 
-- Categories: Equity, Hybrid, Debt, Solution Oriented, Other
+### Title
 
-##### 2.2.3 Derived Features
-- AUM/NAV Ratio: aum_funds_individual_lst / nav_funds_individual_lst
+Predictive Analytics for Mutual Fund Return Forecasting Using Machine Learning Regression Models
 
-- Purpose: Measure fund size relative to NAV
+### Problem Statement
 
-- Equity Concentration: equity_per / 100
+Retail investors often compare mutual funds using past returns, ratings, AUM, risk category, and portfolio allocation. However, these variables are usually interpreted manually. This project converts fund-level attributes into a machine learning problem: given a fund's measurable characteristics, predict its expected 1-year, 3-year, and 5-year return percentages.
 
-- Purpose: Normalize equity percentage to 0-1 scale
+### Research Question
 
-- Debt Concentration: debt_per / 100
+Can fund characteristics such as AUM, NAV, rating, risk category, equity allocation, debt allocation, and fund category be used to predict mutual fund returns across different investment horizons?
 
-- Purpose: Normalize debt percentage to 0-1 scale
+### Hypothesis
 
-- Fund Type Indicators:
+Funds with higher equity allocation, stronger ratings, higher risk profiles, and favorable historical structural characteristics should show distinguishable return patterns. Machine learning models, especially ensemble tree models, should capture non-linear relationships better than simple linear regression.
 
-- is_equity_fund: Binary indicator (1 if Equity, else 0)
+### Dataset
 
-- is_hybrid_fund: Binary indicator (1 if Hybrid, else 0)
+The project data was collected from Groww mutual fund pages. The dataset contains around 1,065 records in the main notebook analysis, with target availability varying by investment horizon:
 
-#### 2.3 Final Feature Set (13 Features)
-aum_funds_individual_lst - Assets Under Management
+| Target | Available Samples | Availability |
+| --- | ---: | ---: |
+| 1-year returns | 966 | 90.7% |
+| 3-year returns | 817 | 76.7% |
+| 5-year returns | 696 | 65.4% |
 
-nav_funds_individual_lst - Net Asset Value
+The reduced training feature set uses fund attributes rather than fund names or URLs, so predictions are based on characteristics and not direct fund identity.
 
-rating_of_funds_individual_lst - Fund Rating (1-5)
+### Input Features
 
-minimum_funds_individual_lst - Minimum Investment
+| Feature | Meaning |
+| --- | --- |
+| `aum_funds_individual_lst` | Assets Under Management, cleaned from rupee/crore text into numeric form. |
+| `nav_funds_individual_lst` | Net Asset Value per unit. |
+| `rating_of_funds_individual_lst` | Fund rating, typically from 1 to 5. |
+| `minimum_funds_individual_lst` | Minimum investment amount. |
+| `debt_per` | Percentage allocation to debt instruments. |
+| `equity_per` | Percentage allocation to equity instruments. |
+| `risk_score` | Numeric encoding of categorical risk profile. |
+| `fund_type_encoded` | Numeric encoding of fund category. |
+| `aum_nav_ratio` | AUM divided by NAV plus 1. |
+| `equity_concentration` | Equity percentage normalized to 0 to 1. |
+| `debt_concentration` | Debt percentage normalized to 0 to 1. |
+| `is_equity_fund` | Binary flag for equity funds. |
+| `is_hybrid_fund` | Binary flag for hybrid funds. |
 
-debt_per - Debt Allocation Percentage
+### Target Variables
 
-equity_per - Equity Allocation Percentage
+- `one_year_returns`: return percentage over 1 year.
+- `three_year_returns`: return percentage over 3 years.
+- `five_year_returns`: return percentage over 5 years.
 
-risk_score - Encoded Risk Level
+### Methodology
 
-fund_type_encoded - Encoded Fund Type
+1. Raw data was scraped from Groww mutual fund listing pages and individual fund pages.
+2. Additional portfolio statistics were collected using Groww scheme code endpoints.
+3. Unnecessary columns such as URLs, names, PE/PB, average maturity, and yield-to-maturity were removed for the cleaned modelling dataset.
+4. AUM and NAV strings were converted into numeric values.
+5. Risk profile and fund category were encoded into numeric model inputs.
+6. Derived features were created for allocation concentration and AUM/NAV ratio.
+7. Separate datasets were prepared for each target because return availability differs by horizon.
+8. Missing feature values were handled using `KNNImputer` during notebook training.
+9. Multiple regression algorithms were compared.
+10. Final Gradient Boosting models were trained separately for 1-year, 3-year, and 5-year targets.
+11. The final deployment pipeline was saved as `mutual_fund_returns_pipeline.pkl`.
 
-aum_nav_ratio - AUM to NAV Ratio
+### Algorithms Tested
 
-equity_concentration - Normalized Equity Allocation
+| Algorithm | Why It Was Tested |
+| --- | --- |
+| Linear Regression | Simple baseline model for linear relationships. |
+| Ridge Regression | Regularized linear model to reduce overfitting and multicollinearity. |
+| Random Forest Regressor | Ensemble bagging model that captures non-linear interactions. |
+| Gradient Boosting Regressor | Ensemble boosting model designed to improve prediction error sequentially. |
 
-debt_concentration - Normalized Debt Allocation
+### Final Model
 
-is_equity_fund - Equity Fund Indicator
+The final deployment pipeline uses `GradientBoostingRegressor` models for the three horizons. In the notebook, the final model configuration was:
 
-is_hybrid_fund - Hybrid Fund Indicator
+```python
+GradientBoostingRegressor(
+    n_estimators=150,
+    learning_rate=0.1,
+    max_depth=4,
+    random_state=42
+)
+```
 
-### 3. Machine Learning Algorithms Used
-#### 3.1 Algorithm Selection
-Four algorithms were tested for each prediction horizon:
+Separate models and scalers are stored for:
 
-##### 3.1.1 Linear Regression
-- Type: Linear model
+- `1_year`
+- `3_year`
+- `5_year`
 
-- Advantages: Simple, interpretable, fast
+### Reported Model Performance
 
-- Hyperparameters: Default sklearn parameters
+The main notebook reports the following final in-sample diagnostics:
 
-##### 3.1.2 Ridge Regression
-- Type: Regularized linear model
+| Horizon | R2 Score | RMSE | MAE | Samples | 95% Error Bound |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1-Year | 0.853 | 2.97% | 1.999% | 966 | +/- 6.438% |
+| 3-Year | 0.949 | 1.64% | 1.115% | 817 | +/- 3.766% |
+| 5-Year | 0.959 | 0.78% | 0.554% | 696 | +/- 1.688% |
 
-- Advantages: Handles multicollinearity, prevents overfitting
+Interpretation: lower RMSE and MAE mean the predicted return is closer to the actual observed return. R2 measures how much variance in the target is explained by the model.
 
-- Hyperparameters: alpha=1.0 (L2 regularization strength)
+Important evaluation caution: the notebook also includes time-series cross-validation comparisons with much weaker and sometimes negative R2 values. This means the very strong final scores should be presented carefully as final fitted-model diagnostics, not guaranteed real-world forecasting accuracy. For a production-grade financial model, the project should add a strict out-of-sample holdout period and test on funds/dates not used during training.
 
-##### 3.1.3 Random Forest Regressor
-- Type: Ensemble method (bagging)
+### Key Observations
 
-- Advantages: Handles non-linearity, robust to outliers
+- Equity and debt allocation are highly important for 3-year and 5-year return behavior.
+- Fund rating is especially important for 5-year prediction in the notebook feature importance output.
+- NAV and AUM/NAV ratio contribute to prediction, but their effect should be interpreted carefully because NAV scale differs across funds.
+- Risk score and equity concentration show strong correlation with medium and long-term returns.
+- Long-horizon targets have fewer samples, so the model may be more sensitive to data availability.
 
-- Hyperparameters:
+## Application Workflow
 
-n_estimators=100 (number of trees)
+The Streamlit app has three main pages:
 
-random_state=42 (reproducibility)
+### Returns Prediction
 
-##### 3.1.4 Gradient Boosting Regressor ⭐ BEST PERFORMER
-- Type: Ensemble method (boosting)
+The user enters:
 
-- Advantages: High accuracy, handles complex patterns
+- AUM in crores.
+- NAV.
+- Fund rating.
+- Equity allocation percentage.
+- Risk profile.
+- Fund category.
+- Prediction period: 1 year, 3 years, or 5 years.
 
-- Hyperparameters:
+The app calculates debt allocation as `100 - equity allocation`, builds the engineered feature row, loads the saved pipeline, applies the correct scaler and model, then displays the predicted return and an interpretation.
 
-n_estimators=100 (number of boosting stages)
+If the model cannot be loaded or prediction fails, the app uses a heuristic fallback calculation so the UI remains usable.
 
-learning_rate=0.1 (shrinkage)
+### Analytics
 
-max_depth=3 (maximum tree depth)
+The dashboard loads data from a Google Sheet first. If that fails, it falls back to `data/cleaned_data.xlsx`. It includes:
 
-random_state=42 (reproducibility)
+- Average returns by horizon.
+- Returns distribution boxplot.
+- Average returns by fund category.
+- Equity allocation vs 3-year returns scatter plot.
+- Risk category performance table.
+- Risk category distribution charts.
+- Top 10 funds by 3-year and 5-year returns.
+- Data explorer with filters and CSV download.
 
-#### 3.2 Final Model Selection
-Gradient Boosting Regressor was selected as the final model due to superior performance across all time horizons.
+### About Tool
 
-### 4. Model Training & Validation
-#### 4.1 Dataset Splits
-- 1-Year Returns: 966 samples
+This page explains how the app works, its intended use, investment assumptions, and disclaimer.
 
-- 3-Year Returns: 817 samples
+## How to Run Locally
 
-- 4-Year Returns: 696 samples
+### 1. Create and activate a virtual environment
 
-#### 4.2 Cross-Validation Strategy
-- TimeSeriesSplit with 5 folds:
+Use Python 3.11. The project's `runtime.txt` currently specifies `python-3.11.4`, and the saved model pickle is not compatible with newer scikit-learn versions commonly installed under Python 3.12.
 
-python
-tscv = TimeSeriesSplit(n_splits=5)
-- Purpose: Respect temporal ordering in financial data, prevent data leakage
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+```
 
-#### 4.3 Feature Scaling
-- Method: StandardScaler (Z-score normalization)
+On Windows:
 
-- Formula: (x - mean) / std
+```bash
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+```
 
-- Applied: Separately for each time horizon dataset
+### 2. Install dependencies
 
-#### 4.4 Missing Value Imputation for Features
-- Method: KNNImputer with n_neighbors=5
+```bash
+pip install -r requirements.txt
+```
 
-- Purpose: Use similar funds to impute missing feature values
+### 3. Run the Streamlit app
 
-### 5. Model Performance & Fine-Tuning
-#### 5.1 Performance Metrics
-- R² Score: Proportion of variance explained
+```bash
+streamlit run app.py
+```
 
-- RMSE: Root Mean Square Error (in percentage points)
+The app should open in the browser. If it does not open automatically, use the local URL printed by Streamlit, usually `http://localhost:8501`.
 
-- MAE: Mean Absolute Error (in percentage points)
+## How to Rebuild the Data
 
-5.2 Final Model Performance
-1-Year Returns Model
-R² Score: 0.853 (85.3% variance explained)
+Run the scraper:
 
-RMSE: 2.97% (average prediction error)
+```bash
+python "scraper and extraction.py"
+```
 
-Samples: 966 funds
+This creates or overwrites:
 
-Interpretation: Predictions typically within ±2.97% of actual returns
+```text
+raw_data.xlsx
+```
 
-3-Year Returns Model
-R² Score: 0.949 (94.9% variance explained)
+Then run the transformation script:
 
-RMSE: 1.64% (average prediction error)
+```bash
+python Tranformation.py
+```
 
-Samples: 817 funds
+This script reads `raw_data.xlsx`, removes unused columns, converts selected string columns, and writes a cleaned Excel file.
 
-Interpretation: Excellent predictive power for medium-term
+Note: web scraping depends on Groww page structure and network availability. If Groww changes class names, endpoints, or response formats, the scraper may need updates.
 
-5-Year Returns Model
-R² Score: 0.959 (95.9% variance explained)
+## How to Rebuild the Model
 
-RMSE: 0.78% (average prediction error)
+Open and run:
 
-Samples: 696 funds
+```text
+p1.ipynb
+```
 
-Interpretation: Outstanding precision for long-term forecasting
+The notebook performs:
 
-5.3 Feature Importance Analysis
-Top 5 Features Across All Models:
-Equity Allocation (%) - Most important predictor
+- Data loading.
+- Data exploration.
+- Feature engineering.
+- Correlation analysis.
+- Model comparison.
+- Final model training.
+- Diagnostics.
+- Pipeline export.
 
-Fund Rating - Strong quality indicator
+The final export is:
 
-Risk Score - Volatility measure
+```text
+mutual_fund_returns_pipeline.pkl
+```
 
-AUM Size - Fund stability and size
+## Presentation Talking Points
 
-Fund Type - Investment strategy category
+- This project solves a regression problem: predicting future return percentages from fund characteristics.
+- The data pipeline starts with scraping, then cleaning, then feature engineering, then modelling, then app deployment.
+- Multiple algorithms were tested to compare simple linear models against ensemble models.
+- Gradient Boosting was selected because it can model non-linear relationships and performed strongly in the final notebook diagnostics.
+- The deployed Streamlit app makes the model usable by non-technical users.
+- The analytics dashboard supports visual explanation of fund categories, risk levels, and return distributions.
+- The strongest limitation is that financial markets are non-stationary, so model accuracy can degrade when market conditions change.
+- Strong reported model scores should be presented with the caveat that future validation should use strict out-of-sample testing.
 
-5.4 Hyperparameter Tuning
-For Gradient Boosting:
+## Known Limitations and Future Improvements
 
-Increased n_estimators from 100 to 150 for final model
+- The scraper is fragile because it depends on external website HTML classes.
+- The model uses fund-level static attributes and does not include macroeconomic indicators, market index returns, interest rates, inflation, expense ratio trends, or fund manager changes.
+- The final notebook metrics include fitted-model diagnostics; production validation should include a separate holdout set.
+- The app currently asks for a small subset of user-friendly inputs and fills some engineered features automatically.
+- The saved pipeline does not include the original imputers, so the app uses deterministic defaults for features not entered by the user.
+- The saved pickle depends on the compatible Python/scikit-learn versions pinned in `requirements.txt`; retraining and exporting a newer pipeline is recommended before upgrading dependencies.
+- Future versions should store preprocessing, imputation, encoding, scaling, and models in one sklearn `Pipeline` object per horizon.
+- Future versions should include model explainability with SHAP or permutation importance in the app.
+- Future versions should add unit tests for feature generation and prediction loading.
 
-Tuned learning_rate to 0.1 (optimal balance)
+## Issues Fixed During Review
 
-Set max_depth to 4 (prevent overfitting)
+- Added `requirements.txt` so dependencies are installable reproducibly.
+- Pinned `scikit-learn==1.3.0` because the saved model artifact was exported with that version and fails to load correctly on newer releases.
+- Updated `app.py` to load the saved `joblib` model pipeline correctly.
+- Updated prediction logic to select the correct model/scaler for 1-year, 3-year, or 5-year predictions.
+- Added feature engineering in the app so user inputs match the saved model's expected feature columns.
+- Added a local analytics fallback to `data/cleaned_data.xlsx` when Google Sheets loading fails.
 
-6. Key Technical Innovations
-6.1 Multi-Horizon Modeling
-Separate models for 1-year, 3-year, and 5-year predictions
+## Disclaimer
 
-Each model optimized for its specific time horizon
-
-Different feature importance patterns across horizons
-
-6.2 Financial Domain Feature Engineering
-Created ratios and concentrations meaningful in finance
-
-Encoded risk profiles numerically
-
-Added fund type indicators for strategy patterns
-
-6.3 Robust Validation
-Time-series cross-validation prevents temporal data leakage
-
-Multiple evaluation metrics for comprehensive assessment
-
-Confidence intervals for prediction uncertainty
-
-7. Model Interpretation & Business Impact
-7.1 Prediction Confidence
-68% Confidence: Prediction ± RMSE
-
-95% Confidence: Prediction ± 2×RMSE
-
-7.2 Business Applications
-Portfolio Optimization: Asset allocation decisions
-
-Fund Selection: Identify high-potential funds
-
-Risk Management: Understand expected return ranges
-
-Client Reporting: Data-driven return expectations
-
-7.3 Model Limitations
-Data Recency: Historical patterns may not reflect future market conditions
-
-Macro Factors: No macroeconomic indicators included
-
-Fund Changes: Management changes not captured in features
-
-8. Deployment Architecture
-8.1 Model Pipeline
-python
-pipeline = {
-    'models': {  # Separate models for each horizon
-        '1_year': GradientBoostingRegressor(),
-        '3_year': GradientBoostingRegressor(), 
-        '5_year': GradientBoostingRegressor()
-    },
-    'scalers': {  # Separate scalers for each horizon
-        '1_year': StandardScaler(),
-        '3_year': StandardScaler(),
-        '5_year': StandardScaler()
-    },
-    'feature_columns': list_of_13_features,
-    'performance_metrics': performance_data
-}
-8.2 Prediction Process
-Input fund characteristics
-
-Feature engineering (same as training)
-
-Scale features using appropriate scaler
-
-Predict using corresponding horizon model
-
-Return prediction with confidence intervals
-
-9. Technology Stack
-Programming: Python 3.8+
-
-ML Framework: Scikit-learn 1.3.0
-
-Data Processing: Pandas, NumPy
-
-Visualization: Matplotlib, Seaborn
-
-Deployment: Streamlit, Joblib
-
-Validation: TimeSeriesSplit, Cross-validation
-
-10. Key Success Factors
-10.1 Data Quality
-Large dataset (1001 funds)
-
-Comprehensive feature set
-
-Real-world financial data
-
-10.2 Algorithm Selection
-Gradient Boosting optimal for financial patterns
-
-Handles non-linear relationships well
-
-Robust to outliers and noise
-
-10.3 Feature Engineering
-Domain-specific feature creation
-
-Meaningful ratios and encodings
-
-Comprehensive coverage of fund characteristics
-
-10.4 Validation Strategy
-Temporal cross-validation
-
-Multiple performance metrics
-
-Realistic error estimation
-
-## 5 Major Reasons for NOT Filling Missing Target Values
-1. ❌ Creates Fake Training Labels
-Filling missing returns creates artificial training data
-
-Model learns false patterns that don't exist in reality
-
-2. ❌ Introduces Data Leakage
-Using other returns to fill missing values leaks future information
-
-Model performance becomes artificially inflated and unreliable
-
-3. ❌ Violates ML Fundamentals
-Target variables must represent ground truth, not estimates
-
-Breaks the basic principle of supervised learning integrity
-
-4. ❌ Poor Real-world Performance
-Models trained on fake data fail with new, genuine data
-
-Business decisions based on inaccurate predictions
-
-5. ❌ Financial Regulation Risk
-Misleading return predictions violate financial compliance
-
-"Past performance" disclaimers require actual historical data
+This project is for academic and demonstration purposes only. Predicted returns are statistical estimates based on historical data and selected fund attributes. They should not be treated as guaranteed future returns or investment recommendations. Always consult a qualified financial advisor before making investment decisions.
