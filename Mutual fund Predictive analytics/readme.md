@@ -1,6 +1,6 @@
 # Mutual Fund Predictive Analytics
 
-##  App Link -> [https://mutualfundpredictionankush.streamlit.app/](https://mutualfundpredictionankush.streamlit.app/)
+##  App Link -> [(https://mutualfundsreturnprediction.streamlit.app/)](https://mutualfundsreturnprediction.streamlit.app/))
 
 ## Abstract
 
